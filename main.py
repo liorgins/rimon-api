@@ -5,11 +5,6 @@ API_URL = "https://rimonapi.weevi.com/api/ekomcategories/md_GetStaticData?search
 # Set as 'INFO' or 'DEBUG'
 VERBOSITY_LEVEL = 'INFO'
 
-LEVEL_MAP = {
-    'INFO': logging.INFO,
-    'DEBUG': logging.DEBUG
-}
-
 def main():
     run_full_extraction(API_URL, LEVEL_MAP[VERBOSITY_LEVEL])
 
