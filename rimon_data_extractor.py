@@ -196,25 +196,29 @@ def process_data(data: Dict, logger: VerboseLogger):
     logger.info(f"Elapsed time: {elapsed:.2f} seconds")
     logger.debug("Run finished.")
 
-if __name__ == "__main__":
-    API_URL = "https://rimonapi.weevi.com/api/ekomcategories/md_GetStaticData?searchKey=categories&preventcaching=true&returnasstring=false"
+def run_full_extraction(api_url, verbosity):
+    import os
+    import logging
+    from datetime import datetime
     temp_logger = logging.getLogger("TempLogger")
-    temp_logger.handlers = []  # Remove any existing handlers to prevent duplicates
+    temp_logger.handlers = []
     temp_logger.addHandler(logging.StreamHandler())
-    temp_logger.setLevel(logging.INFO)
+    temp_logger.setLevel(verbosity)
     temp_logger.info("Starting run...")
-    data = fetch_from_api(API_URL, VerboseLogger('/dev/null'))
+    data = fetch_from_api(api_url, VerboseLogger(os.devnull, level=verbosity))
     if data is None:
         temp_logger.error("Failed to fetch data from API")
         exit(1)
     logs_dir = "logs"
-    if not os.path.exists(logs_dir):
-        os.makedirs(logs_dir)
+    os.makedirs(logs_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     results_dir = os.path.join(logs_dir, f"{timestamp}")
-    os.makedirs(results_dir, exist_ok=True)
     raw_dir = os.path.join(results_dir, 'raw')
     os.makedirs(raw_dir, exist_ok=True)
     log_file = os.path.join(raw_dir, 'run.log')
-    logger = VerboseLogger(log_file, level=logging.INFO)
-    process_data(data, logger) 
+    logger = VerboseLogger(log_file, level=verbosity)
+    process_data(data, logger)
+
+if __name__ == "__main__":
+    API_URL = "https://rimonapi.weevi.com/api/ekomcategories/md_GetStaticData?searchKey=categories&preventcaching=true&returnasstring=false"
+    run_full_extraction(API_URL, logging.INFO) 
