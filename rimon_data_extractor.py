@@ -76,25 +76,35 @@ def clean_category_for_hierarchy(category: Dict) -> Dict:
 
 def process_data(data: Dict):
     """Process and export data to various formats."""
-    # Generate readable timestamp for folder name
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S-%f")
-    results_dir = f"results-{timestamp}"
-    
-    # Create results directory
+    # Ensure logs directory exists (but do not recreate if exists)
+    logs_dir = "logs"
+    if not os.path.exists(logs_dir):
+        os.makedirs(logs_dir)
+
+    # Generate readable timestamp for folder name (up to seconds, no milliseconds)
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    results_dir = os.path.join(logs_dir, f"{timestamp}")
     os.makedirs(results_dir, exist_ok=True)
+
+    # Create subdirectories for JSON and CSV
+    json_dir = os.path.join(results_dir, 'json')
+    csv_dir = os.path.join(results_dir, 'csv')
+    os.makedirs(json_dir, exist_ok=True)
+    os.makedirs(csv_dir, exist_ok=True)
+
+    # Define filenames with paths
+    raw_data_json = os.path.join(results_dir, 'raw_data.json')
+    categories_csv = os.path.join(csv_dir, 'categories.csv')
+    categories_json = os.path.join(json_dir, 'categories.json')
+    categories_hierarchy_json = os.path.join(json_dir, 'categories-hierarchy.json')
+    categories_hierarchy_csv = os.path.join(csv_dir, 'categories-hierarchy.csv')
+    products_csv = os.path.join(csv_dir, 'products.csv')
+    products_json = os.path.join(json_dir, 'products.json')
     
     # Navigate to the relevant data
     base_data = data['staticData']['data']['country_118']['primaryLang']
     categories = base_data.get('categories', {}).get('Data', [])
     products = base_data.get('products', [])
-    
-    # Define filenames with paths
-    raw_data_json = os.path.join(results_dir, 'raw_data.json')
-    categories_csv = os.path.join(results_dir, 'categories.csv')
-    categories_json = os.path.join(results_dir, 'categories.json')
-    categories_hierarchy_json = os.path.join(results_dir, 'categories-hierarchy.json')
-    products_csv = os.path.join(results_dir, 'products.csv')
-    products_json = os.path.join(results_dir, 'products.json')
     
     # Process and export categories
     flattened_categories = flatten_categories(categories)
@@ -120,6 +130,34 @@ def process_data(data: Dict):
     with open(categories_hierarchy_json, 'w', encoding='utf-8') as f:
         json.dump(hierarchical_categories, f, indent=2)
     print(f"Categories hierarchy JSON created successfully: {categories_hierarchy_json}")
+    
+    # Export hierarchical categories to CSV (flattened)
+    def flatten_hierarchy_for_csv(categories, parent_id=None):
+        rows = []
+        for cat in categories:
+            row = {
+                'id': cat.get('id', ''),
+                'title': cat.get('title', ''),
+                'urlTitle': cat.get('urlTitle', ''),
+                'description': cat.get('description', ''),
+                'showOnHomepage': cat.get('showOnHomepage', False),
+                'showOnMenu': cat.get('showOnMenu', False),
+                'priority': cat.get('priority', 0),
+                'imgSrc': cat.get('imgSrc', ''),
+                'parent_id': parent_id
+            }
+            rows.append(row)
+            if cat.get('subcategories'):
+                rows.extend(flatten_hierarchy_for_csv(cat['subcategories'], cat.get('id', '')))
+        return rows
+    hierarchy_flat = flatten_hierarchy_for_csv(hierarchical_categories)
+    if hierarchy_flat:
+        fieldnames = hierarchy_flat[0].keys()
+        with open(categories_hierarchy_csv, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(hierarchy_flat)
+        print(f"Categories hierarchy CSV created successfully: {categories_hierarchy_csv}")
     
     # Export products to CSV
     if products:
