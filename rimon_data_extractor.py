@@ -214,7 +214,7 @@ def run_full_extraction(api_url, verbosity):
     os.makedirs(logs_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     results_dir = os.path.join(logs_dir, f"{timestamp}")
-    raw_dir = os.path.join(results_dir, 'raw')
+    raw_dir = os.path.join(results_dir, 'Raw')
     os.makedirs(raw_dir, exist_ok=True)
     log_file = os.path.join(raw_dir, 'run.log')
     logger = VerboseLogger(log_file, level=verbosity)
