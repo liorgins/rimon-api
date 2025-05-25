@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 import logging
 import time
+from logging_levels import LEVEL_MAP
 
 # Logger setup
 class VerboseLogger:
@@ -31,11 +32,6 @@ class VerboseLogger:
     def set_level(self, level):
         self.console_handler.setLevel(level)
         self.level = level
-
-LEVEL_MAP = {
-    'INFO': logging.INFO,
-    'DEBUG': logging.DEBUG
-}
 
 def fetch_from_api(url: str, logger: VerboseLogger) -> Optional[Dict]:
     """Fetch data from API and save to JSON file."""
