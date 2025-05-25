@@ -14,11 +14,11 @@ def get_latest_run_dirs(logs_dir="logs"):
     return sorted_runs[-2], sorted_runs[-1]
 
 def get_raw_dir(run_dir):
-    # Find 'Raw' or 'raw' directory (case-insensitive)
-    for entry in os.listdir(run_dir):
-        if entry.lower() == 'raw' and os.path.isdir(os.path.join(run_dir, entry)):
-            return os.path.join(run_dir, entry)
-    raise FileNotFoundError(f"No 'Raw' or 'raw' directory found in {run_dir}")
+    # Only accept 'Raw' (capital R) directory
+    raw_dir = os.path.join(run_dir, 'Raw')
+    if os.path.isdir(raw_dir):
+        return raw_dir
+    raise FileNotFoundError(f"No 'Raw' directory found in {run_dir}")
 
 def get_delta_dirs():
     _, curr_run = get_latest_run_dirs()
@@ -165,6 +165,7 @@ def calculate_delta():
         save_csv(flatten_categories(cat_added), os.path.join(csv_dir, 'categories_added.csv'))
         save_csv(flatten_categories(cat_removed), os.path.join(csv_dir, 'categories_removed.csv'))
         save_csv(flatten_categories(cat_changed), os.path.join(csv_dir, 'categories_changed.csv'))
+        logger.info(f"Delta categories - added: {len(cat_added)}, removed: {len(cat_removed)}, changed: {len(cat_changed)}")
         # Products
         prod_added, prod_removed, prod_changed = diff_items(prev_products, curr_products)
         save_json(prod_added, os.path.join(json_dir, 'products_added.json'))
@@ -173,6 +174,7 @@ def calculate_delta():
         save_csv(prod_added, os.path.join(csv_dir, 'products_added.csv'))
         save_csv(prod_removed, os.path.join(csv_dir, 'products_removed.csv'))
         save_csv(prod_changed, os.path.join(csv_dir, 'products_changed.csv'))
+        logger.info(f"Delta products - added: {len(prod_added)}, removed: {len(prod_removed)}, changed: {len(prod_changed)}")
         # Categories hierarchy (hierarchical delta)
         def get_hierarchy(categories):
             return [clean_category_for_hierarchy(cat) for cat in categories]

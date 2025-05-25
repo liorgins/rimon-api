@@ -105,8 +105,8 @@ def process_data(data: Dict, logger: VerboseLogger):
     results_dir = os.path.join(logs_dir, f"{timestamp}")
     logger.info(f"Creating results directory: {results_dir}")
     os.makedirs(results_dir, exist_ok=True)
-    # Create 'raw' subdirectory
-    raw_dir = os.path.join(results_dir, 'raw')
+    # Create 'Raw' subdirectory
+    raw_dir = os.path.join(results_dir, 'Raw')
     os.makedirs(raw_dir, exist_ok=True)
     json_dir = os.path.join(raw_dir, 'json')
     csv_dir = os.path.join(raw_dir, 'csv')
