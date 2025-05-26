@@ -1,4 +1,7 @@
 venv/
+.venv-py312/
 logs/
+eng-heb-dictionary/2*/
+eng-heb-dictionary backup/
 __pycache__/
 *.pyc 
