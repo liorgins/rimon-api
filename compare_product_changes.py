@@ -4,6 +4,7 @@ import json
 from glob import glob
 
 def get_latest_run_dirs(logs_dir="logs"):
+    """Return the two latest run directories inside the logs directory for comparison purposes."""
     run_dirs = [d for d in glob(os.path.join(logs_dir, '*')) if os.path.isdir(d)]
     if len(run_dirs) < 2:
         raise FileNotFoundError("Not enough run directories found in logs/ to compare.")
@@ -11,6 +12,7 @@ def get_latest_run_dirs(logs_dir="logs"):
     return sorted_runs[-2], sorted_runs[-1]
 
 def get_raw_data(run_dir):
+    """Load the products section from raw_data.json in the given run directory and return a dict keyed by product id."""
     raw_path = os.path.join(run_dir, 'Raw', 'raw_data.json')
     with open(raw_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
@@ -18,6 +20,7 @@ def get_raw_data(run_dir):
     return {str(p['id']): p for p in products}
 
 def compare_products():
+    """Compare changed products between the two latest runs and output a CSV with field-level changes for each product."""
     prev_run, curr_run = get_latest_run_dirs()
     delta_csv_dir = os.path.join(curr_run, 'Delta', 'csv')
     changed_csv = os.path.join(delta_csv_dir, 'products_changed.csv')

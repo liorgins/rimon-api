@@ -5,6 +5,7 @@ import logging
 from glob import glob
 
 def get_latest_run_dirs(logs_dir="logs"):
+    """Return the two latest run directories inside the logs directory for comparison purposes."""
     if not os.path.exists(logs_dir):
         raise FileNotFoundError(f"Logs directory '{logs_dir}' does not exist.")
     run_dirs = [d for d in glob(os.path.join(logs_dir, '*')) if os.path.isdir(d)]
@@ -14,6 +15,7 @@ def get_latest_run_dirs(logs_dir="logs"):
     return sorted_runs[-2], sorted_runs[-1]
 
 def get_raw_dir(run_dir):
+    """Return the path to the 'Raw' directory inside a run directory. Raises if not found."""
     # Only accept 'Raw' (capital R) directory
     raw_dir = os.path.join(run_dir, 'Raw')
     if os.path.isdir(raw_dir):
@@ -21,6 +23,7 @@ def get_raw_dir(run_dir):
     raise FileNotFoundError(f"No 'Raw' directory found in {run_dir}")
 
 def get_delta_dirs():
+    """Return the current run directory and paths to Delta, csv, and json subdirectories for the latest run."""
     _, curr_run = get_latest_run_dirs()
     delta_dir = os.path.join(curr_run, 'Delta')
     csv_dir = os.path.join(delta_dir, 'csv')
@@ -28,6 +31,7 @@ def get_delta_dirs():
     return curr_run, delta_dir, csv_dir, json_dir
 
 def setup_logger(log_path):
+    """Set up a logger that logs both to file and to console, with INFO and DEBUG levels."""
     logger = logging.getLogger("DeltaLogger")
     logger.handlers = []
     logger.setLevel(logging.DEBUG)
@@ -41,6 +45,7 @@ def setup_logger(log_path):
     return logger
 
 def create_delta_structure():
+    """Create the Delta/csv and Delta/json folder structure for the latest run, and set up logging."""
     curr_run, delta_dir, csv_dir, json_dir = get_delta_dirs()
     os.makedirs(delta_dir, exist_ok=True)
     os.makedirs(csv_dir, exist_ok=True)
@@ -51,21 +56,25 @@ def create_delta_structure():
     return logger, curr_run, delta_dir, csv_dir, json_dir
 
 def load_raw_data(run_dir):
+    """Load the raw_data.json file from the given run directory."""
     raw_dir = get_raw_dir(run_dir)
     raw_path = os.path.join(raw_dir, 'raw_data.json')
     with open(raw_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def extract_sections(data):
+    """Extract categories and products sections from the loaded raw data."""
     base = data['staticData']['data']['country_118']['primaryLang']
     categories = base.get('categories', {}).get('Data', [])
     products = base.get('products', [])
     return categories, products
 
 def dictify_by_id(items):
+    """Convert a list of dicts to a dict keyed by 'id'."""
     return {str(item.get('id', '')): item for item in items}
 
 def diff_items(old, new):
+    """Return lists of added, removed, and changed items between two lists of dicts (by id)."""
     old_dict = dictify_by_id(old)
     new_dict = dictify_by_id(new)
     added = [v for k, v in new_dict.items() if k not in old_dict]
@@ -74,10 +83,12 @@ def diff_items(old, new):
     return added, removed, changed
 
 def save_json(data, path):
+    """Save a Python object as a JSON file to the given path."""
     with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 def save_csv(items, path):
+    """Save a list of dicts as a CSV file to the given path. Writes header if items exist, else creates empty file."""
     if not items:
         with open(path, 'w', newline='', encoding='utf-8') as f:
             f.write('')
@@ -89,6 +100,7 @@ def save_csv(items, path):
         writer.writerows(items)
 
 def flatten_categories(categories, parent_title=None):
+    """Flatten a nested category structure into a flat list with parent information for CSV export."""
     flattened = []
     for category in categories:
         flat_category = {
@@ -108,6 +120,7 @@ def flatten_categories(categories, parent_title=None):
     return flattened
 
 def clean_category_for_hierarchy(category):
+    """Clean a category dict for hierarchical export, recursively including subcategories."""
     cleaned = {
         'id': category.get('id', ''),
         'title': category.get('title', ''),
@@ -125,6 +138,7 @@ def clean_category_for_hierarchy(category):
     return cleaned
 
 def flatten_hierarchy_for_csv(categories, parent_id=None):
+    """Flatten a hierarchical category structure for CSV export, including parent_id references."""
     rows = []
     for cat in categories:
         row = {
@@ -144,6 +158,7 @@ def flatten_hierarchy_for_csv(categories, parent_id=None):
     return rows
 
 def calculate_delta():
+    """Main function to calculate the delta (added/removed/changed) for categories, products, and hierarchy between the two latest runs. Outputs results as JSON and CSV."""
     logger, prev_run, delta_dir, csv_dir, json_dir = None, None, None, None, None
     try:
         prev_run, curr_run = get_latest_run_dirs()

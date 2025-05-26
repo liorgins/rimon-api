@@ -7,6 +7,7 @@ try:
     from googletrans import Translator
     translator = Translator()
     def translate_to_hebrew(text):
+        """Translate English text to Hebrew using googletrans, or return empty string if not available."""
         try:
             result = translator.translate(text, src='en', dest='he')
             print(f"Translating '{text}' -> '{result.text}'")
@@ -21,6 +22,7 @@ except ImportError:
         return ''
 
 def get_latest_csv_dir():
+    """Return the path to the latest run's Raw/csv directory inside logs/."""
     logs_dir = 'logs'
     run_dirs = [d for d in glob(os.path.join(logs_dir, '*')) if os.path.isdir(d)]
     if not run_dirs:
@@ -32,6 +34,7 @@ def get_latest_csv_dir():
     return csv_dir
 
 def extract_products(csv_path):
+    """Extract product id, sku, and title from a products CSV file."""
     products = []
     with open(csv_path, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
@@ -44,6 +47,7 @@ def extract_products(csv_path):
     return products
 
 def load_existing_dictionary(dict_path):
+    """Load an existing dictionary CSV file and return a dict keyed by (id, sku)."""
     existing = {}
     if os.path.exists(dict_path):
         with open(dict_path, newline='', encoding='utf-8') as f:
@@ -54,6 +58,7 @@ def load_existing_dictionary(dict_path):
     return existing
 
 def write_products_dictionary(products, out_path, auto_translate=True):
+    """Write a products dictionary CSV with English and Hebrew columns, auto-translating if requested."""
     existing = load_existing_dictionary(out_path)
     new_rows = []
     for prod in products:
@@ -77,6 +82,7 @@ def write_products_dictionary(products, out_path, auto_translate=True):
             writer.writerow(row)
 
 def main():
+    """Main function to generate English-Hebrew dictionary CSVs for products, categories, and category hierarchy from the latest run's CSVs."""
     # Test translation
     print('Test translation for "Apple":', translate_to_hebrew('Apple'))
 
