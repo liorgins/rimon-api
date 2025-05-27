@@ -1,12 +1,23 @@
 import os
 import csv
 import json
+import logging
 from glob import glob
+
+# Logger setup
+logger = logging.getLogger("ProductChangeLogger")
+logger.handlers = []
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S'))
+ch.setLevel(logging.INFO)
+logger.addHandler(ch)
 
 def get_latest_run_dirs(logs_dir="logs"):
     """Return the two latest run directories inside the logs directory for comparison purposes."""
     run_dirs = [d for d in glob(os.path.join(logs_dir, '*')) if os.path.isdir(d)]
     if len(run_dirs) < 2:
+        logger.error("Not enough run directories found in logs/ to compare.")
         raise FileNotFoundError("Not enough run directories found in logs/ to compare.")
     sorted_runs = sorted(run_dirs)
     return sorted_runs[-2], sorted_runs[-1]
@@ -29,12 +40,16 @@ def compare_products():
     prev_products = get_raw_data(prev_run)
     curr_products = get_raw_data(curr_run)
 
+    if not os.path.exists(changed_csv):
+        logger.error(f"Changed products file not found: {changed_csv}")
+        return
+
     with open(changed_csv, newline='', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         changed_products = [row for row in reader]
 
     if not changed_products:
-        print("No changed products found in products_changed.csv. Exiting.")
+        logger.info("No changed products found in products_changed.csv. Exiting.")
         return
 
     fieldnames = ['id', 'sku', 'title', 'field', 'old_value', 'new_value']
@@ -59,7 +74,7 @@ def compare_products():
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
-    print(f"Wrote detailed product changes to: {output_csv}")
+    logger.info(f"Wrote detailed product changes to: {output_csv}")
 
 if __name__ == "__main__":
     compare_products() 

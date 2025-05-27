@@ -2,6 +2,7 @@ import os
 import csv
 from glob import glob
 from datetime import datetime
+import logging
 
 try:
     from googletrans import Translator
@@ -10,15 +11,15 @@ try:
         """Translate English text to Hebrew using googletrans, or return empty string if not available."""
         try:
             result = translator.translate(text, src='en', dest='he')
-            print(f"[DEBUG] Translating '{text}' -> '{result.text}'")  # DEBUG log for each translation
+            logger.debug(f"Translating '{text}' -> '{result.text}'")
             return result.text
         except Exception as e:
-            print(f"Translation failed for '{text}': {e}")
+            logger.error(f"Translation failed for '{text}': {e}")
             return ''
 except ImportError:
     print("googletrans is not installed. Please run: pip install googletrans==4.0.0-rc1")
     def translate_to_hebrew(text):
-        print(f"Translation skipped for '{text}' (googletrans not installed)")
+        logger.warning(f"Translation skipped for '{text}' (googletrans not installed)")
         return ''
 
 try:
@@ -26,15 +27,32 @@ try:
 except ImportError:
     GENERATE_DICTIONARY = True  # Default if config.py is missing
 
+# Logger setup
+logger = logging.getLogger("DictionaryLogger")
+logger.handlers = []
+logger.setLevel(logging.DEBUG)
+log_dir = 'eng-heb-dictionary'
+os.makedirs(log_dir, exist_ok=True)
+log_path = os.path.join(log_dir, 'dictionary.log')
+file_handler = logging.FileHandler(log_path, encoding='utf-8')
+file_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S'))
+logger.addHandler(file_handler)
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%H:%M:%S'))
+console_handler.setLevel(logging.INFO)
+logger.addHandler(console_handler)
+
 def get_latest_csv_dir():
     """Return the path to the latest run's Raw/csv directory inside logs/."""
     logs_dir = 'logs'
     run_dirs = [d for d in glob(os.path.join(logs_dir, '*')) if os.path.isdir(d)]
     if not run_dirs:
+        logger.error('No run directories found in logs/.')
         raise FileNotFoundError('No run directories found in logs/.')
     latest_run = sorted(run_dirs)[-1]
     csv_dir = os.path.join(latest_run, 'Raw', 'csv')
     if not os.path.isdir(csv_dir):
+        logger.error(f'No csv directory found in {latest_run}/Raw/')
         raise FileNotFoundError(f'No csv directory found in {latest_run}/Raw/')
     return csv_dir
 
@@ -75,10 +93,10 @@ def write_products_dictionary(products, out_path, auto_translate=True):
     all_new_ids = set(prod['id'] for prod in products)
 
     # 3. Log the comparison
-    print(f"[INFO] Comparing {len(all_new_ids)} product IDs from latest run to {len(translated_ids)} already translated IDs in dictionary...")
+    logger.info(f"Comparing {len(all_new_ids)} product IDs from latest run to {len(translated_ids)} already translated IDs in dictionary...")
     intersection = all_new_ids & translated_ids
     ids_to_translate = all_new_ids - translated_ids
-    print(f"[INFO] {len(intersection)} products already translated (will be skipped). {len(ids_to_translate)} new products will be translated.")
+    logger.info(f"{len(intersection)} products already translated (will be skipped). {len(ids_to_translate)} new products will be translated.")
 
     # 4. Filter products to only those needing translation
     products_to_translate = [prod for prod in products if prod['id'] in ids_to_translate]
@@ -109,7 +127,7 @@ def write_products_dictionary(products, out_path, auto_translate=True):
 def main():
     """Main function to generate English-Hebrew dictionary CSVs for products, categories, and category hierarchy from the latest run's CSVs."""
     if not GENERATE_DICTIONARY:
-        print("[INFO] Skipping dictionary generation (GENERATE_DICTIONARY=False in config.py)")
+        logger.info("Skipping dictionary generation (GENERATE_DICTIONARY=False in config.py)")
         return
 
     csv_dir = get_latest_csv_dir()
@@ -153,7 +171,7 @@ def main():
             for val in sorted(cat_names):
                 if val not in existing:
                     heb = translate_to_hebrew(val)
-                    print(f"[DEBUG] Translating category '{val}' -> '{heb}'")
+                    logger.debug(f"Translating category '{val}' -> '{heb}'")
                     writer.writerow([val, heb])
                     categories_written += 1
 
@@ -182,14 +200,14 @@ def main():
             for val in sorted(hier_titles):
                 if val not in existing:
                     heb = translate_to_hebrew(val)
-                    print(f"[DEBUG] Translating hierarchy title '{val}' -> '{heb}'")
+                    logger.debug(f"Translating hierarchy title '{val}' -> '{heb}'")
                     writer.writerow([val, heb])
                     hierarchy_written += 1
 
-    print(f"Dictionaries created in: {out_dir}")
-    print(f"Products written: {products_written}, products translated: {products_translated}")
-    print(f"Categories written: {categories_written}")
-    print(f"Hierarchy titles written: {hierarchy_written}")
+    logger.info(f"Dictionaries created in: {out_dir}")
+    logger.info(f"Products written: {products_written}, products translated: {products_translated}")
+    logger.info(f"Categories written: {categories_written}")
+    logger.info(f"Hierarchy titles written: {hierarchy_written}")
 
 if __name__ == "__main__":
     main() 
