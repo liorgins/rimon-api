@@ -159,14 +159,10 @@ def flatten_hierarchy_for_csv(categories, parent_id=None):
 
 def calculate_delta():
     """Main function to calculate the delta (added/removed/changed) for categories, products, and hierarchy between the two latest runs. Outputs results as JSON and CSV."""
-    logger, prev_run, delta_dir, csv_dir, json_dir = None, None, None, None, None
     try:
-        prev_run, curr_run = get_latest_run_dirs()
-        delta_dir = os.path.join(curr_run, 'Delta')
-        csv_dir = os.path.join(delta_dir, 'csv')
-        json_dir = os.path.join(delta_dir, 'json')
-        log_path = os.path.join(delta_dir, 'delta.log')
-        logger = setup_logger(log_path)
+        logger, prev_run, delta_dir, csv_dir, json_dir = create_delta_structure()
+        # get_latest_run_dirs כבר נקרא בתוך create_delta_structure, אז נשתמש בנתיב prev_run שהיא מחזירה
+        _, curr_run = get_latest_run_dirs()
         logger.info(f"Calculating delta between: {prev_run} -> {curr_run}")
         prev_data = load_raw_data(prev_run)
         curr_data = load_raw_data(curr_run)
@@ -204,7 +200,7 @@ def calculate_delta():
         save_csv(flatten_hierarchy_for_csv(hier_changed), os.path.join(csv_dir, 'categories_hierarchy_changed.csv'))
         logger.info(f"Delta files created in: {delta_dir}")
     except Exception as e:
-        if logger:
+        if 'logger' in locals() and logger:
             logger.error(f"Delta calculation failed: {e}")
         else:
             print(f"Delta calculation failed: {e}")
