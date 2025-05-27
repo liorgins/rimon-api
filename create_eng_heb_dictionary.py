@@ -24,7 +24,7 @@ except ImportError:
 try:
     from config import GENERATE_DICTIONARY
 except ImportError:
-    GENERATE_DICTIONARY = True  # ברירת מחדל אם אין קונפיג
+    GENERATE_DICTIONARY = True  # Default if config.py is missing
 
 def get_latest_csv_dir():
     """Return the path to the latest run's Raw/csv directory inside logs/."""
@@ -63,14 +63,30 @@ def load_existing_dictionary(dict_path):
     return existing
 
 def write_products_dictionary(products, out_path, auto_translate=True):
-    """Write a products dictionary CSV with English and Hebrew columns, auto-translating if requested."""
+    """
+    Write a products dictionary CSV with English and Hebrew columns, auto-translating only new products.
+    Only products whose IDs are not already in the dictionary will be translated and added.
+    """
+    # 1. Load existing dictionary and collect all translated product IDs
     existing = load_existing_dictionary(out_path)
+    translated_ids = set(key[0] for key in existing.keys())  # key is (id, sku)
+
+    # 2. Collect all product IDs from the new products list
+    all_new_ids = set(prod['id'] for prod in products)
+
+    # 3. Log the comparison
+    print(f"[INFO] Comparing {len(all_new_ids)} product IDs from latest run to {len(translated_ids)} already translated IDs in dictionary...")
+    intersection = all_new_ids & translated_ids
+    ids_to_translate = all_new_ids - translated_ids
+    print(f"[INFO] {len(intersection)} products already translated (will be skipped). {len(ids_to_translate)} new products will be translated.")
+
+    # 4. Filter products to only those needing translation
+    products_to_translate = [prod for prod in products if prod['id'] in ids_to_translate]
+
     new_rows = []
     translated_count = 0
-    for prod in products:
+    for prod in products_to_translate:
         key = (prod['id'], prod['sku'])
-        if key in existing:
-            continue  # Skip existing
         heb = translate_to_hebrew(prod['english']) if auto_translate else ''
         if heb:
             translated_count += 1
@@ -95,8 +111,6 @@ def main():
     if not GENERATE_DICTIONARY:
         print("[INFO] Skipping dictionary generation (GENERATE_DICTIONARY=False in config.py)")
         return
-    # Test translation
-    print('Test translation for "Apple":', translate_to_hebrew('Apple'))
 
     csv_dir = get_latest_csv_dir()
     out_dir = 'eng-heb-dictionary'

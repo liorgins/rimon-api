@@ -13,4 +13,4 @@ LEVEL_MAP = {
 }
 
 # Flag to control whether to generate the English-Hebrew dictionary
-GENERATE_DICTIONARY = False 
+GENERATE_DICTIONARY = True 
