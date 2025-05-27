@@ -6,9 +6,8 @@ from glob import glob
 
 def get_latest_run_dirs(logs_dir="logs"):
     """Return the two latest run directories inside the logs directory for comparison purposes."""
-    if not os.path.exists(logs_dir):
-        raise FileNotFoundError(f"Logs directory '{logs_dir}' does not exist.")
     run_dirs = [d for d in glob(os.path.join(logs_dir, '*')) if os.path.isdir(d)]
+    print(f"[DEBUG] Found run directories: {run_dirs}")
     if len(run_dirs) < 2:
         raise FileNotFoundError("Not enough run directories found in logs/ to compare.")
     sorted_runs = sorted(run_dirs)
@@ -47,10 +46,12 @@ def setup_logger(log_path):
 def create_delta_structure():
     """Create the Delta/csv and Delta/json folder structure for the latest run, and set up logging."""
     curr_run, delta_dir, csv_dir, json_dir = get_delta_dirs()
+    print(f"[DEBUG] Creating Delta structure at: {delta_dir}")
     os.makedirs(delta_dir, exist_ok=True)
     os.makedirs(csv_dir, exist_ok=True)
     os.makedirs(json_dir, exist_ok=True)
     log_path = os.path.join(delta_dir, 'delta.log')
+    print(f"[DEBUG] Creating delta.log at: {log_path}")
     logger = setup_logger(log_path)
     logger.info(f"Created Delta structure at: {delta_dir}\n  - {csv_dir}\n  - {json_dir}")
     return logger, curr_run, delta_dir, csv_dir, json_dir
@@ -59,6 +60,7 @@ def load_raw_data(run_dir):
     """Load the raw_data.json file from the given run directory."""
     raw_dir = get_raw_dir(run_dir)
     raw_path = os.path.join(raw_dir, 'raw_data.json')
+    print(f"[DEBUG] Loading raw_data.json from: {raw_path}")
     with open(raw_path, 'r', encoding='utf-8') as f:
         return json.load(f)
 
@@ -67,6 +69,9 @@ def extract_sections(data):
     base = data['staticData']['data']['country_118']['primaryLang']
     categories = base.get('categories', {}).get('Data', [])
     products = base.get('products', [])
+    print(f"[DEBUG] Extracted {len(categories)} categories, {len(products)} products")
+    print(f"[DEBUG] Category ids: {[c.get('id') for c in categories]}")
+    print(f"[DEBUG] Product ids: {[p.get('id') for p in products]}")
     return categories, products
 
 def dictify_by_id(items):
@@ -80,6 +85,9 @@ def diff_items(old, new):
     added = [v for k, v in new_dict.items() if k not in old_dict]
     removed = [v for k, v in old_dict.items() if k not in new_dict]
     changed = [v for k, v in new_dict.items() if k in old_dict and v != old_dict[k]]
+    print(f"[DEBUG] diff_items: added ids: {[v.get('id') for v in added]}")
+    print(f"[DEBUG] diff_items: removed ids: {[v.get('id') for v in removed]}")
+    print(f"[DEBUG] diff_items: changed ids: {[v.get('id') for v in changed]}")
     return added, removed, changed
 
 def save_json(data, path):
@@ -157,49 +165,77 @@ def flatten_hierarchy_for_csv(categories, parent_id=None):
             rows.extend(flatten_hierarchy_for_csv(cat['subcategories'], cat.get('id', '')))
     return rows
 
+def get_prev_and_curr_runs():
+    """Return prev_run and curr_run directories, raise if not enough or if they are the same."""
+    prev_run, curr_run = get_latest_run_dirs()
+    if prev_run == curr_run:
+        print(f"[ERROR] prev_run and curr_run are the same! Delta calculation skipped. prev_run={prev_run}")
+        return None, None
+    return prev_run, curr_run
+
+def calculate_and_save_category_delta(prev_categories, curr_categories, json_dir, csv_dir, logger):
+    print("[DEBUG] Starting diff_items for categories...")
+    cat_added, cat_removed, cat_changed = diff_items(prev_categories, curr_categories)
+    print("[DEBUG] Saving categories delta outputs...")
+    save_json(cat_added, os.path.join(json_dir, 'categories_added.json'))
+    save_json(cat_removed, os.path.join(json_dir, 'categories_removed.json'))
+    save_json(cat_changed, os.path.join(json_dir, 'categories_changed.json'))
+    save_csv(flatten_categories(cat_added), os.path.join(csv_dir, 'categories_added.csv'))
+    save_csv(flatten_categories(cat_removed), os.path.join(csv_dir, 'categories_removed.csv'))
+    save_csv(flatten_categories(cat_changed), os.path.join(csv_dir, 'categories_changed.csv'))
+    logger.info(f"Delta categories - added: {len(cat_added)}, removed: {len(cat_removed)}, changed: {len(cat_changed)}")
+
+def calculate_and_save_product_delta(prev_products, curr_products, json_dir, csv_dir, logger):
+    print("[DEBUG] Starting diff_items for products...")
+    prod_added, prod_removed, prod_changed = diff_items(prev_products, curr_products)
+    print("[DEBUG] Saving products delta outputs...")
+    save_json(prod_added, os.path.join(json_dir, 'products_added.json'))
+    save_json(prod_removed, os.path.join(json_dir, 'products_removed.json'))
+    save_json(prod_changed, os.path.join(json_dir, 'products_changed.json'))
+    save_csv(prod_added, os.path.join(csv_dir, 'products_added.csv'))
+    save_csv(prod_removed, os.path.join(csv_dir, 'products_removed.csv'))
+    save_csv(prod_changed, os.path.join(csv_dir, 'products_changed.csv'))
+    logger.info(f"Delta products - added: {len(prod_added)}, removed: {len(prod_removed)}, changed: {len(prod_changed)}")
+
+def calculate_and_save_hierarchy_delta(prev_categories, curr_categories, json_dir, csv_dir, logger):
+    print("[DEBUG] Starting diff_items for hierarchy...")
+    def get_hierarchy(categories):
+        return [clean_category_for_hierarchy(cat) for cat in categories]
+    prev_hier = get_hierarchy(prev_categories)
+    curr_hier = get_hierarchy(curr_categories)
+    hier_added, hier_removed, hier_changed = diff_items(prev_hier, curr_hier)
+    print("[DEBUG] Saving hierarchy delta outputs...")
+    save_json(hier_added, os.path.join(json_dir, 'categories_hierarchy_added.json'))
+    save_json(hier_removed, os.path.join(json_dir, 'categories_hierarchy_removed.json'))
+    save_json(hier_changed, os.path.join(json_dir, 'categories_hierarchy_changed.json'))
+    save_csv(flatten_hierarchy_for_csv(hier_added), os.path.join(csv_dir, 'categories_hierarchy_added.csv'))
+    save_csv(flatten_hierarchy_for_csv(hier_removed), os.path.join(csv_dir, 'categories_hierarchy_removed.csv'))
+    save_csv(flatten_hierarchy_for_csv(hier_changed), os.path.join(csv_dir, 'categories_hierarchy_changed.csv'))
+    logger.info(f"Delta hierarchy files created.")
+
 def calculate_delta():
     """Main function to calculate the delta (added/removed/changed) for categories, products, and hierarchy between the two latest runs. Outputs results as JSON and CSV."""
+    print("[DEBUG] === calculate_delta: START ===")
     try:
         logger, prev_run, delta_dir, csv_dir, json_dir = create_delta_structure()
-        # get_latest_run_dirs כבר נקרא בתוך create_delta_structure, אז נשתמש בנתיב prev_run שהיא מחזירה
-        _, curr_run = get_latest_run_dirs()
-        logger.info(f"Calculating delta between: {prev_run} -> {curr_run}")
+        print(f"[DEBUG] Delta structure created. Delta dir: {delta_dir}")
+        prev_run, curr_run = get_prev_and_curr_runs()
+        if not prev_run or not curr_run:
+            if 'logger' in locals() and logger:
+                logger.error(f"Delta calculation skipped: prev_run and curr_run are the same! {prev_run}")
+            return
         prev_data = load_raw_data(prev_run)
         curr_data = load_raw_data(curr_run)
+        print("[DEBUG] Loaded both raw_data.json files.")
         prev_categories, prev_products = extract_sections(prev_data)
         curr_categories, curr_products = extract_sections(curr_data)
-        # Categories
-        cat_added, cat_removed, cat_changed = diff_items(prev_categories, curr_categories)
-        save_json(cat_added, os.path.join(json_dir, 'categories_added.json'))
-        save_json(cat_removed, os.path.join(json_dir, 'categories_removed.json'))
-        save_json(cat_changed, os.path.join(json_dir, 'categories_changed.json'))
-        save_csv(flatten_categories(cat_added), os.path.join(csv_dir, 'categories_added.csv'))
-        save_csv(flatten_categories(cat_removed), os.path.join(csv_dir, 'categories_removed.csv'))
-        save_csv(flatten_categories(cat_changed), os.path.join(csv_dir, 'categories_changed.csv'))
-        logger.info(f"Delta categories - added: {len(cat_added)}, removed: {len(cat_removed)}, changed: {len(cat_changed)}")
-        # Products
-        prod_added, prod_removed, prod_changed = diff_items(prev_products, curr_products)
-        save_json(prod_added, os.path.join(json_dir, 'products_added.json'))
-        save_json(prod_removed, os.path.join(json_dir, 'products_removed.json'))
-        save_json(prod_changed, os.path.join(json_dir, 'products_changed.json'))
-        save_csv(prod_added, os.path.join(csv_dir, 'products_added.csv'))
-        save_csv(prod_removed, os.path.join(csv_dir, 'products_removed.csv'))
-        save_csv(prod_changed, os.path.join(csv_dir, 'products_changed.csv'))
-        logger.info(f"Delta products - added: {len(prod_added)}, removed: {len(prod_removed)}, changed: {len(prod_changed)}")
-        # Categories hierarchy (hierarchical delta)
-        def get_hierarchy(categories):
-            return [clean_category_for_hierarchy(cat) for cat in categories]
-        prev_hier = get_hierarchy(prev_categories)
-        curr_hier = get_hierarchy(curr_categories)
-        hier_added, hier_removed, hier_changed = diff_items(prev_hier, curr_hier)
-        save_json(hier_added, os.path.join(json_dir, 'categories_hierarchy_added.json'))
-        save_json(hier_removed, os.path.join(json_dir, 'categories_hierarchy_removed.json'))
-        save_json(hier_changed, os.path.join(json_dir, 'categories_hierarchy_changed.json'))
-        save_csv(flatten_hierarchy_for_csv(hier_added), os.path.join(csv_dir, 'categories_hierarchy_added.csv'))
-        save_csv(flatten_hierarchy_for_csv(hier_removed), os.path.join(csv_dir, 'categories_hierarchy_removed.csv'))
-        save_csv(flatten_hierarchy_for_csv(hier_changed), os.path.join(csv_dir, 'categories_hierarchy_changed.csv'))
+        calculate_and_save_category_delta(prev_categories, curr_categories, json_dir, csv_dir, logger)
+        calculate_and_save_product_delta(prev_products, curr_products, json_dir, csv_dir, logger)
+        calculate_and_save_hierarchy_delta(prev_categories, curr_categories, json_dir, csv_dir, logger)
         logger.info(f"Delta files created in: {delta_dir}")
+        print("[DEBUG] === calculate_delta: END ===")
     except Exception as e:
+        print(f"[DEBUG] Exception in calculate_delta: {e}")
         if 'logger' in locals() and logger:
             logger.error(f"Delta calculation failed: {e}")
         else:

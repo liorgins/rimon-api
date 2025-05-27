@@ -10,7 +10,7 @@ try:
         """Translate English text to Hebrew using googletrans, or return empty string if not available."""
         try:
             result = translator.translate(text, src='en', dest='he')
-            print(f"Translating '{text}' -> '{result.text}'")
+            print(f"[DEBUG] Translating '{text}' -> '{result.text}'")  # DEBUG log for each translation
             return result.text
         except Exception as e:
             print(f"Translation failed for '{text}': {e}")
@@ -20,6 +20,11 @@ except ImportError:
     def translate_to_hebrew(text):
         print(f"Translation skipped for '{text}' (googletrans not installed)")
         return ''
+
+try:
+    from config import GENERATE_DICTIONARY
+except ImportError:
+    GENERATE_DICTIONARY = True  # ברירת מחדל אם אין קונפיג
 
 def get_latest_csv_dir():
     """Return the path to the latest run's Raw/csv directory inside logs/."""
@@ -61,11 +66,14 @@ def write_products_dictionary(products, out_path, auto_translate=True):
     """Write a products dictionary CSV with English and Hebrew columns, auto-translating if requested."""
     existing = load_existing_dictionary(out_path)
     new_rows = []
+    translated_count = 0
     for prod in products:
         key = (prod['id'], prod['sku'])
         if key in existing:
             continue  # Skip existing
         heb = translate_to_hebrew(prod['english']) if auto_translate else ''
+        if heb:
+            translated_count += 1
         new_rows.append({
             'id': prod['id'],
             'sku': prod['sku'],
@@ -80,9 +88,13 @@ def write_products_dictionary(products, out_path, auto_translate=True):
             writer.writeheader()
         for row in new_rows:
             writer.writerow(row)
+    return len(new_rows), translated_count
 
 def main():
     """Main function to generate English-Hebrew dictionary CSVs for products, categories, and category hierarchy from the latest run's CSVs."""
+    if not GENERATE_DICTIONARY:
+        print("[INFO] Skipping dictionary generation (GENERATE_DICTIONARY=False in config.py)")
+        return
     # Test translation
     print('Test translation for "Apple":', translate_to_hebrew('Apple'))
 
@@ -93,12 +105,17 @@ def main():
     # Products
     products_csv = os.path.join(csv_dir, 'products.csv')
     products_dict_csv = os.path.join(out_dir, 'products_dictionary.csv')
+    products_written = 0
+    products_translated = 0
     if os.path.exists(products_csv):
         products = extract_products(products_csv)
-        write_products_dictionary(products, products_dict_csv, auto_translate=True)
+        written, translated = write_products_dictionary(products, products_dict_csv, auto_translate=True)
+        products_written += written
+        products_translated += translated
 
     # Categories
     categories_csv = os.path.join(csv_dir, 'categories.csv')
+    categories_written = 0
     if os.path.exists(categories_csv):
         cat_names = set()
         with open(categories_csv, newline='', encoding='utf-8') as f:
@@ -122,10 +139,13 @@ def main():
             for val in sorted(cat_names):
                 if val not in existing:
                     heb = translate_to_hebrew(val)
+                    print(f"[DEBUG] Translating category '{val}' -> '{heb}'")
                     writer.writerow([val, heb])
+                    categories_written += 1
 
     # Categories hierarchy
     categories_hier_csv = os.path.join(csv_dir, 'categories-hierarchy.csv')
+    hierarchy_written = 0
     if os.path.exists(categories_hier_csv):
         hier_titles = set()
         with open(categories_hier_csv, newline='', encoding='utf-8') as f:
@@ -148,9 +168,14 @@ def main():
             for val in sorted(hier_titles):
                 if val not in existing:
                     heb = translate_to_hebrew(val)
+                    print(f"[DEBUG] Translating hierarchy title '{val}' -> '{heb}'")
                     writer.writerow([val, heb])
+                    hierarchy_written += 1
 
     print(f"Dictionaries created in: {out_dir}")
+    print(f"Products written: {products_written}, products translated: {products_translated}")
+    print(f"Categories written: {categories_written}")
+    print(f"Hierarchy titles written: {hierarchy_written}")
 
 if __name__ == "__main__":
     main() 
