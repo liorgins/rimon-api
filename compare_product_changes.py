@@ -30,7 +30,7 @@ def get_raw_data(run_dir):
     products = data['staticData']['data']['country_118']['primaryLang'].get('products', [])
     return {str(p['id']): p for p in products}
 
-def compare_products():
+def compare_delta():
     """Compare changed products between the two latest runs and output a CSV with field-level changes for each product."""
     prev_run, curr_run = get_latest_run_dirs()
     delta_csv_dir = os.path.join(curr_run, 'Delta', 'csv')
@@ -77,4 +77,4 @@ def compare_products():
     logger.info(f"Wrote detailed product changes to: {output_csv}")
 
 if __name__ == "__main__":
-    compare_products() 
+    compare_delta() 
