@@ -3,14 +3,26 @@ import csv
 from glob import glob
 from datetime import datetime
 import logging
+import re
+import json
+import shutil
 
 try:
     from googletrans import Translator
     translator = Translator()
     def translate_to_hebrew(text):
         """Translate English text to Hebrew using googletrans, or return empty string if not available."""
+        if not text or not isinstance(text, str):
+            logger.warning(f"Invalid input for translation: {text}")
+            return ''
         try:
             result = translator.translate(text, src='en', dest='he')
+            if result is None:
+                logger.warning(f"Translation returned None for '{text}'")
+                return ''
+            if not hasattr(result, 'text') or not result.text:
+                logger.warning(f"Translation result has no text attribute or empty text for '{text}'")
+                return ''
             logger.debug(f"Translating '{text}' -> '{result.text}'")
             return result.text
         except Exception as e:
@@ -80,6 +92,15 @@ def load_existing_dictionary(dict_path):
                 existing[key] = row
     return existing
 
+def sanitize(text):
+    if not text:
+        return ''
+    text = str(text).strip()
+    text = re.sub(r'^"+|"+$', '', text)  # Remove leading/trailing double quotes
+    text = re.sub(r'\s+', ' ', text)     # Collapse multiple spaces
+    text = text.replace('/', '').replace('\\', '')  # Remove all slashes
+    return text.lower()
+
 def write_products_dictionary(products, out_path, auto_translate=True):
     """
     Write a products dictionary CSV with English and Hebrew columns, auto-translating only new products.
@@ -105,13 +126,14 @@ def write_products_dictionary(products, out_path, auto_translate=True):
     translated_count = 0
     for prod in products_to_translate:
         key = (prod['id'], prod['sku'])
-        heb = translate_to_hebrew(prod['english']) if auto_translate else ''
+        english = sanitize(prod['english'])
+        heb = sanitize(translate_to_hebrew(english)) if auto_translate else ''
         if heb:
             translated_count += 1
         new_rows.append({
-            'id': prod['id'],
-            'sku': prod['sku'],
-            'english': prod['english'],
+            'id': sanitize(prod['id']),
+            'sku': sanitize(prod['sku']),
+            'english': english,
             'hebrew': heb
         })
     # Write header if file doesn't exist, else append
@@ -122,6 +144,15 @@ def write_products_dictionary(products, out_path, auto_translate=True):
             writer.writeheader()
         for row in new_rows:
             writer.writerow(row)
+
+    # After writing CSV, also write JSON
+    json_path = out_path.replace('.csv', '.json')
+    dict_json = {f"{sanitize(row['id'])},{sanitize(row['sku'])}": {"english": row['english'], "hebrew": row['hebrew']} for row in new_rows}
+    # Also add existing rows
+    for key, row in existing.items():
+        dict_json[f"{sanitize(row['id'])},{sanitize(row['sku'])}"] = {"english": sanitize(row['english']), "hebrew": sanitize(row['hebrew'])}
+    with open(json_path, 'w', encoding='utf-8') as jf:
+        json.dump(dict_json, jf, ensure_ascii=False, indent=2)
     return len(new_rows), translated_count
 
 def main():
@@ -170,10 +201,21 @@ def main():
                 writer.writerow(['english', 'hebrew'])
             for val in sorted(cat_names):
                 if val not in existing:
-                    heb = translate_to_hebrew(val)
+                    heb = sanitize(translate_to_hebrew(val))
                     logger.debug(f"Translating category '{val}' -> '{heb}'")
-                    writer.writerow([val, heb])
+                    writer.writerow([sanitize(val), heb])
                     categories_written += 1
+
+        # In main(), after writing categories_dictionary.csv, also write categories_dictionary.json
+        cat_dict_json_path = cat_dict_path.replace('.csv', '.json')
+        cat_dict_json = {}
+        if os.path.exists(cat_dict_path):
+            with open(cat_dict_path, newline='', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    cat_dict_json[sanitize(row['english'])] = sanitize(row['hebrew'])
+        with open(cat_dict_json_path, 'w', encoding='utf-8') as jf:
+            json.dump(cat_dict_json, jf, ensure_ascii=False, indent=2)
 
     # Categories hierarchy
     categories_hier_csv = os.path.join(csv_dir, 'categories-hierarchy.csv')
@@ -199,15 +241,39 @@ def main():
                 writer.writerow(['english', 'hebrew'])
             for val in sorted(hier_titles):
                 if val not in existing:
-                    heb = translate_to_hebrew(val)
+                    heb = sanitize(translate_to_hebrew(val))
                     logger.debug(f"Translating hierarchy title '{val}' -> '{heb}'")
-                    writer.writerow([val, heb])
+                    writer.writerow([sanitize(val), heb])
                     hierarchy_written += 1
+
+        # In main(), after writing categories_hierarchy_dictionary.csv, also write categories_hierarchy_dictionary.json
+        hier_dict_json_path = hier_dict_path.replace('.csv', '.json')
+        hier_dict_json = {}
+        if os.path.exists(hier_dict_path):
+            with open(hier_dict_path, newline='', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    hier_dict_json[sanitize(row['english'])] = sanitize(row['hebrew'])
+        with open(hier_dict_json_path, 'w', encoding='utf-8') as jf:
+            json.dump(hier_dict_json, jf, ensure_ascii=False, indent=2)
 
     logger.info(f"Dictionaries created in: {out_dir}")
     logger.info(f"Products written: {products_written}, products translated: {products_translated}")
     logger.info(f"Categories written: {categories_written}")
     logger.info(f"Hierarchy titles written: {hierarchy_written}")
+
+    # --- Auto-copy all dictionary files to ecommerce-site/public ---
+    public_dir = os.path.join(os.path.dirname(__file__), 'ecommerce-site', 'public')
+    for fname in [
+        'products_dictionary.csv', 'products_dictionary.json',
+        'categories_dictionary.csv', 'categories_dictionary.json',
+        'categories_hierarchy_dictionary.csv', 'categories_hierarchy_dictionary.json',
+    ]:
+        src = os.path.join(out_dir, fname)
+        dst = os.path.join(public_dir, fname)
+        if os.path.exists(src):
+            shutil.copy2(src, dst)
+            logger.info(f"Copied {src} -> {dst}")
 
 if __name__ == "__main__":
     main() 
