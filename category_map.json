@@ -1,0 +1,103 @@
+{
+  "": [
+    "Baby Products Beauty and Personal Care Products",
+    "Bread and Pastries",
+    "Food and Grocery Items",
+    "Chicken Meat Deli",
+    "Dairy Products",
+    "Drinks Coffee, Tea",
+    "Frozen Foods",
+    "Grains",
+    "Home and Disposable Items",
+    "Household & Cleaning Products",
+    "Judaica",
+    "Nuts& Dried Fruits",
+    "Shabbat Market",
+    "Snacks and Sweets",
+    "Spices",
+    "Asian Products"
+  ],
+  "Baby Products Beauty and Personal Care Products": [
+    "Shower and Bath Products",
+    "Baby Food"
+  ],
+  "Bread and Pastries": [
+    "Bread",
+    "Cakes and Cookies",
+    "Crackers, Crispbread, and Flakes",
+    "Bakery"
+  ],
+  "Food and Grocery Items": [
+    "Baking Products",
+    "Cooking Products",
+    "Canned Foods",
+    "Spreads, dips, sauces"
+  ],
+  "Chicken Meat Deli": [
+    "Fish",
+    "Frozen Meat",
+    "Frozen Chicken and Turkey",
+    "Charcuterie",
+    "Sausages",
+    "Packaged Salads"
+  ],
+  "Dairy Products": [
+    "Milk and Milk Beverages",
+    "Cheeses",
+    "Yogurt& Pudding",
+    "butter",
+    "Cooking &baking cream"
+  ],
+  "Drinks Coffee, Tea": [
+    "Soft Drinks",
+    "coffee",
+    "Grape Juice",
+    "tea",
+    "Drinks,Coffee,Tea"
+  ],
+  "Frozen Foods": [
+    "Frozen Fruits and Vegetables",
+    "PRE-COOKED food",
+    "ice Creams",
+    "Biscooti"
+  ],
+  "Grains": [
+    "Breakfast Cereals",
+    "Grains"
+  ],
+  "Home and Disposable Items": [
+    "Electrical Appliances"
+  ],
+  "Household & Cleaning Products": [
+    "Cleaning Accessories",
+    "Disposable Items"
+  ],
+  "Judaica": [
+    "Kiddush Cups",
+    "Mezuzahs",
+    "Candles"
+  ],
+  "Nuts& Dried Fruits": [
+    "Dried Fruits",
+    "Nuts"
+  ],
+  "Shabbat Market": [
+    "Salads",
+    "Main dish",
+    "Sides",
+    "Desserts",
+    "Deli",
+    "Hot Plate",
+    "Shabbat Essentials"
+  ],
+  "Snacks and Sweets": [
+    "Snacks",
+    "Sweets"
+  ],
+  "Spices": [
+    "Spices"
+  ],
+  "Asian Products": [
+    "Asian"
+  ]
+}

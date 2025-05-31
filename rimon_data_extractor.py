@@ -7,6 +7,7 @@ from typing import List, Dict, Optional, Tuple
 import logging
 import time
 from config import LEVEL_MAP
+import subprocess
 
 # Logger setup
 class VerboseLogger:
@@ -198,6 +199,14 @@ def process_data(data: Dict, logger: VerboseLogger):
     logger.info(f"Total products: {len(products)}")
     logger.info(f"Elapsed time: {elapsed:.2f} seconds")
     logger.debug("Run finished.")
+
+    # Run create_category_map.py to update category_map.json
+    subprocess.run(['python3', 'create_category_map.py'], check=True)
+
+    # Write update.json to trigger React app refresh
+    update_path = os.path.join(os.path.dirname(__file__), 'ecommerce-site', 'public', 'update.json')
+    with open(update_path, 'w') as f:
+        json.dump({'updated': int(time.time())}, f)
 
 def run_full_extraction(api_url, verbosity):
     """Main entry point: fetch data from API, process it, and save all outputs and logs for this run."""
