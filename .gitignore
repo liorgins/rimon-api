@@ -8,3 +8,18 @@ __pycache__/
 eng-heb-dictionary/dictionary.log
 .DS_Store
 ecommerce-site-4567.log
+
+# Ignore all non-MASTER dictionary CSV/JSON files
+eng-heb-dictionary/products_dictionary.csv
+eng-heb-dictionary/products_dictionary.json
+eng-heb-dictionary/categories_dictionary.csv
+eng-heb-dictionary/categories_dictionary.json
+eng-heb-dictionary/categories_hierarchy_dictionary.csv
+eng-heb-dictionary/categories_hierarchy_dictionary.json
+
+ecommerce-site/public/products_dictionary.csv
+ecommerce-site/public/products_dictionary.json
+ecommerce-site/public/categories_dictionary.csv
+ecommerce-site/public/categories_dictionary.json
+ecommerce-site/public/categories_hierarchy_dictionary.csv
+ecommerce-site/public/categories_hierarchy_dictionary.json
