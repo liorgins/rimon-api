@@ -60,6 +60,9 @@ function App() {
     phone: '',
   });
   const [addressError, setAddressError] = useState('');
+  const [editMode, setEditMode] = useState(false);
+  const isAdmin = user && user.email && user.email.toLowerCase() === "zivgin@gmail.com";
+  const [showAdminSaveMsg, setShowAdminSaveMsg] = useState(false);
 
   const EMIRATES = [
     'Abu Dhabi',
@@ -374,7 +377,24 @@ function App() {
               <div key={product.id} style={{ background: '#fff', borderRadius: '12px', boxShadow: '0 2px 8px #0001', padding: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <img src={product.imgSrc} alt={hebrewName} style={{ width: '120px', height: '120px', objectFit: 'contain', marginBottom: '1rem', borderRadius: '8px', background: '#eee' }} />
                 <div style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.5rem', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                  {hebrewName}
+                  {editMode ? (
+                    <input
+                      value={heDict[`${sanitize(product.id)},${sanitize(product.sku)}`]?.hebrew || ''}
+                      onChange={e => {
+                        const key = `${sanitize(product.id)},${sanitize(product.sku)}`;
+                        setHeDict(prev => ({
+                          ...prev,
+                          [key]: {
+                            ...prev[key],
+                            hebrew: e.target.value
+                          }
+                        }));
+                      }}
+                      style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.5rem', textAlign: 'center', border: '1px solid #7b1fa2', borderRadius: 6, padding: 4, minWidth: 80 }}
+                    />
+                  ) : (
+                    <span>{hebrewName}</span>
+                  )}
                   <span style={{
                     fontSize: '0.92em',
                     color: product.availableQuantity <= 2 ? 'red' : '#666',
@@ -420,6 +440,33 @@ function App() {
             );
           })}
         </div>
+        {isAdmin && editMode && (
+          <div style={{ textAlign: 'center', margin: '1rem 0' }}>
+            <button
+              onClick={() => {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(heDict, null, 2));
+                const dlAnchor = document.createElement('a');
+                dlAnchor.setAttribute("href", dataStr);
+                dlAnchor.setAttribute("download", "products_dictionary_EDITED.json");
+                document.body.appendChild(dlAnchor);
+                dlAnchor.click();
+                dlAnchor.remove();
+                setShowAdminSaveMsg(true);
+              }}
+              style={{ background: '#7b1fa2', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 'bold', fontSize: '1.1rem', cursor: 'pointer' }}
+            >
+              שמור מילון מוצרים
+            </button>
+            {showAdminSaveMsg && (
+              <div style={{ color: '#7b1fa2', marginTop: 12, fontWeight: 'bold', fontSize: '1rem' }}>
+                הקובץ נשמר. יש להעלות אותו ידנית ל־<b>eng-heb-dictionary/DICTIONERY_MASTER_PRODUCTS.json</b> כדי לעדכן את המילון הראשי.
+              </div>
+            )}
+            <div style={{ color: '#666', marginTop: 8, fontSize: '0.95rem' }}>
+              שינויים לא נשמרים אוטומטית. יש להעלות את הקובץ ל־Git/שרת.
+            </div>
+          </div>
+        )}
         {showCart && (
           <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: '#0008', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowCart(false)}>
             <div style={{ background: '#fff', borderRadius: 16, minWidth: 340, maxWidth: 480, padding: 24, boxShadow: '0 4px 24px #0003', position: 'relative' }} onClick={e => e.stopPropagation()}>
@@ -552,6 +599,18 @@ function App() {
                       {address.notes && <div><b>הערות:</b> {address.notes}</div>}
                       <div><b>טלפון:</b> {address.phonePrefix || ''}{address.phoneNumber || ''}</div>
                     </div>
+                  )}
+                  {isAdmin && (
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        setEditMode(v => !v);
+                        setShowAvatarMenu(false);
+                      }}
+                      style={{ background: '#e1d7ee', color: '#7b1fa2', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 'bold', width: '100%', marginBottom: 8 }}
+                    >
+                      {editMode ? 'סיים עריכת שמות' : 'ערוך שמות מוצרים'}
+                    </button>
                   )}
                   <button
                     onClick={e => {
