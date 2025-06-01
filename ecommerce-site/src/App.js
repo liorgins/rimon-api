@@ -49,6 +49,31 @@ function App() {
   const [user, setUser] = useState(null);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const avatarMenuRef = useRef();
+  const [showAddressForm, setShowAddressForm] = useState(false);
+  const [address, setAddress] = useState({
+    emirate: '',
+    street: '',
+    apartment: '',
+    fullName: '',
+    floor: '',
+    notes: '',
+    phone: '',
+  });
+  const [addressError, setAddressError] = useState('');
+
+  const EMIRATES = [
+    'Abu Dhabi',
+    'Dubai',
+    'Sharjah',
+    'Ajman',
+    'Umm Al Quwain',
+    'Ras Al Khaimah',
+    'Fujairah',
+  ];
+  const PHONE_PREFIXES = [
+    { value: '+971', label: '🇦🇪 +971' },
+    { value: '+972', label: '🇮🇱 +972' },
+  ];
 
   useEffect(() => {
     Promise.all([
@@ -242,22 +267,65 @@ function App() {
 
   // --- WHATSAPP BUTTON ---
   function getWhatsappMessage() {
-    let msg = "Hi,\n\nI'd like to place an order:\n";
+    let msg = "Hi,%0AI'd like to place an order:%0A";
     cart.forEach(item => {
       const dictEntry = heDict[`${sanitize(item.id)},${sanitize(item.sku)}`] || {};
       const englishName = dictEntry.english || item.title;
-      msg += `- ${englishName} (${item.qty})\n`;
+      msg += `- ${englishName} (${item.qty})%0A`;
     });
+    msg = msg.replace(/%0A$/, ''); // Remove trailing newline
     console.log('Generated WhatsApp message:', msg, 'Length:', msg.length);
     return msg;
   }
 
   function handleWhatsappClick() {
     const msg = getWhatsappMessage();
-    const encodedMsg = encodeURIComponent(msg);
-    const url = `https://wa.me/972546505699?text=${encodedMsg}`;
+    const url = `https://wa.me/972546505699?text=${msg}`;
     console.log('Opening WhatsApp with url:', url, 'Length:', url.length);
     window.open(url, '_blank');
+  }
+
+  // Load address from localStorage per user
+  useEffect(() => {
+    if (user) {
+      const key = `address_${user.sub || user.email}`;
+      const saved = localStorage.getItem(key);
+      if (saved) {
+        setAddress(JSON.parse(saved));
+        console.log('Loaded address for user:', key, JSON.parse(saved));
+      } else {
+        setAddress({ emirate: '', street: '', apartment: '', fullName: '', floor: '', notes: '', phone: '' });
+      }
+    }
+  }, [user]);
+
+  // Prefill fullName from user.name if available
+  useEffect(() => {
+    if (user && user.name && !address.fullName) {
+      setAddress(addr => ({ ...addr, fullName: user.name }));
+    }
+  }, [user]);
+
+  function saveAddress() {
+    // Validation
+    if (!address.emirate || !address.street || !address.apartment || !address.fullName || !address.phonePrefix || !address.phoneNumber) {
+      setAddressError('יש למלא את כל השדות החובה');
+      return;
+    }
+    if (!/^\d{7,12}$/.test(address.phoneNumber) || address.phoneNumber.startsWith('0')) {
+      setAddressError('מספר טלפון חייב להיות 7-12 ספרות, לא להתחיל ב-0, וללא תווים נוספים');
+      return;
+    }
+    setAddressError('');
+    const key = `address_${user.sub || user.email}`;
+    const toSave = { ...address, phone: address.phonePrefix + address.phoneNumber };
+    localStorage.setItem(key, JSON.stringify(toSave));
+    console.log('Saved address for user:', key, toSave);
+    setShowAddressForm(false);
+  }
+
+  function handleAddressChange(e) {
+    setAddress({ ...address, [e.target.name]: e.target.value });
   }
 
   return (
@@ -444,7 +512,7 @@ function App() {
                     boxShadow: '0 2px 12px #0002',
                     borderRadius: 12,
                     padding: '14px 18px 10px 18px',
-                    minWidth: 120,
+                    minWidth: 220,
                     zIndex: 1000,
                     textAlign: 'center',
                   }}
@@ -452,6 +520,27 @@ function App() {
                   <div style={{ marginBottom: 8, color: '#7b1fa2', fontWeight: 'bold', fontSize: '1.1rem' }}>
                     {user.name ? `שלום, ${user.name.split(' ')[0]}` : 'שלום!'}
                   </div>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      setShowAddressForm(true);
+                      setShowAvatarMenu(false);
+                    }}
+                    style={{ background: '#e1d7ee', color: '#7b1fa2', border: 'none', borderRadius: 8, padding: '8px 16px', cursor: 'pointer', fontWeight: 'bold', width: '100%', marginBottom: 8 }}
+                  >
+                    ערוך כתובת
+                  </button>
+                  {address.emirate && (
+                    <div style={{ fontSize: '0.95rem', color: '#333', marginBottom: 8, textAlign: 'right', direction: 'rtl' }}>
+                      <div><b>אמירות:</b> {address.emirate}</div>
+                      <div><b>רחוב/בניין:</b> {address.street}</div>
+                      <div><b>דירה:</b> {address.apartment}</div>
+                      <div><b>שם מלא:</b> {address.fullName}</div>
+                      {address.floor && <div><b>קומה:</b> {address.floor}</div>}
+                      {address.notes && <div><b>הערות:</b> {address.notes}</div>}
+                      <div><b>טלפון:</b> {address.phonePrefix || ''}{address.phoneNumber || ''}</div>
+                    </div>
+                  )}
                   <button
                     onClick={e => {
                       e.stopPropagation();
@@ -525,6 +614,54 @@ function App() {
             <path d="M23.472 18.294c-.355-.177-2.1-1.037-2.424-1.155-.324-.119-.56-.177-.797.177-.237.355-.914 1.155-1.122 1.392-.208.237-.414.266-.769.089-.355-.178-1.5-.553-2.86-1.763-1.057-.944-1.77-2.108-1.98-2.463-.208-.355-.022-.546.156-.723.16-.159.355-.414.533-.62.178-.207.237-.355.355-.592.119-.237.06-.444-.03-.62-.089-.177-.797-1.924-1.09-2.637-.287-.689-.58-.595-.797-.606-.207-.009-.444-.011-.68-.011-.237 0-.62.089-.944.444-.324.355-1.23 1.202-1.23 2.927 0 1.726 1.26 3.393 1.435 3.627.178.237 2.48 3.789 6.006 5.153.84.289 1.495.462 2.006.591.842.213 1.61.183 2.217.111.676-.08 2.1-.858 2.398-1.687.297-.83.297-1.541.208-1.687-.089-.148-.324-.237-.68-.414z" fill="#fff"/>
           </svg>
         </button>
+        {/* Address Form Modal */}
+        {showAddressForm && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: '#0008', zIndex: 10000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowAddressForm(false)}>
+            <form onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, minWidth: 320, maxWidth: 400, padding: 28, boxShadow: '0 4px 24px #0003', position: 'relative', direction: 'rtl', textAlign: 'right' }}>
+              <h2 style={{ color: '#7b1fa2', marginTop: 0, marginBottom: 16, fontSize: '1.3rem' }}>עריכת כתובת</h2>
+              <label>אמירות*<br />
+                <select name="emirate" value={address.emirate} onChange={handleAddressChange} required style={{ width: '100%', marginBottom: 10, padding: 6, borderRadius: 6, border: '1px solid #ccc' }}>
+                  <option value="">בחר אמירות</option>
+                  {EMIRATES.map(e => <option key={e} value={e}>{e}</option>)}
+                </select>
+              </label>
+              <label>רחוב/בניין*<br /><input name="street" value={address.street} onChange={handleAddressChange} required style={{ width: '100%', marginBottom: 10, padding: 6, borderRadius: 6, border: '1px solid #ccc' }} /></label>
+              <label>מספר דירה*<br /><input name="apartment" value={address.apartment} onChange={handleAddressChange} required style={{ width: '100%', marginBottom: 10, padding: 6, borderRadius: 6, border: '1px solid #ccc' }} /></label>
+              <label>שם מלא*<br /><input name="fullName" value={address.fullName} onChange={handleAddressChange} required style={{ width: '100%', marginBottom: 10, padding: 6, borderRadius: 6, border: '1px solid #ccc' }} /></label>
+              <label>קומה<br /><input name="floor" value={address.floor} onChange={handleAddressChange} style={{ width: '100%', marginBottom: 10, padding: 6, borderRadius: 6, border: '1px solid #ccc' }} /></label>
+              <label>הערות<br /><input name="notes" value={address.notes} onChange={handleAddressChange} style={{ width: '100%', marginBottom: 10, padding: 6, borderRadius: 6, border: '1px solid #ccc' }} /></label>
+              <label>טלפון*<br />
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+                  <input name="phoneNumber"
+                    value={address.phoneNumber || ''}
+                    onChange={e => {
+                      let onlyNums = e.target.value.replace(/[^0-9]/g, '');
+                      if (onlyNums.startsWith('0')) {
+                        onlyNums = onlyNums.slice(1);
+                      }
+                      setAddress({ ...address, phoneNumber: onlyNums });
+                    }}
+                    required
+                    placeholder="מספר טלפון"
+                    style={{ flex: 1, padding: 6, borderRadius: 6, border: '1px solid #ccc' }}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={12}
+                  />
+                  <select name="phonePrefix" value={address.phonePrefix || ''} onChange={handleAddressChange} required style={{ minWidth: 90, padding: 6, borderRadius: 6, border: '1px solid #ccc' }}>
+                    <option value="">בחר קידומת</option>
+                    {PHONE_PREFIXES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </div>
+              </label>
+              {addressError && <div style={{ color: 'red', marginBottom: 10 }}>{addressError}</div>}
+              <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+                <button type="button" onClick={() => setShowAddressForm(false)} style={{ flex: 1, background: '#eee', color: '#7b1fa2', border: 'none', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontWeight: 'bold' }}>ביטול</button>
+                <button type="button" onClick={saveAddress} style={{ flex: 1, background: '#7b1fa2', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 0', cursor: 'pointer', fontWeight: 'bold' }}>שמור</button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
     </GoogleOAuthProvider>
   );
