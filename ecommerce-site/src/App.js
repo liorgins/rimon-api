@@ -373,7 +373,19 @@ function App() {
             return (
               <div key={product.id} style={{ background: '#fff', borderRadius: '12px', boxShadow: '0 2px 8px #0001', padding: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <img src={product.imgSrc} alt={hebrewName} style={{ width: '120px', height: '120px', objectFit: 'contain', marginBottom: '1rem', borderRadius: '8px', background: '#eee' }} />
-                <div style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.5rem', textAlign: 'center' }}>{hebrewName}</div>
+                <div style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '0.5rem', textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                  {hebrewName}
+                  <span style={{
+                    fontSize: '0.92em',
+                    color: product.availableQuantity <= 2 ? 'red' : '#666',
+                    fontWeight: 'normal',
+                    marginRight: 4
+                  }}>
+                    ({product.availableQuantity > 9
+                      ? '10+ יחידות'
+                      : `${product.availableQuantity} יחידות`})
+                  </span>
+                </div>
                 <div style={{ color: '#7b1fa2', fontWeight: 'bold', marginBottom: '0.5rem' }}>{product.finalPrice} {product.currency}</div>
                 <div style={{ color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem', textAlign: 'center' }}>{product.categories}</div>
                 {product.available ? (
