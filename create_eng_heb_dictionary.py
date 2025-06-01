@@ -265,8 +265,8 @@ def main():
     # --- Auto-copy all dictionary files to ecommerce-site/public ---
     public_dir = os.path.join(os.path.dirname(__file__), 'ecommerce-site', 'public')
     for fname in [
-        'products_dictionary.csv', 'products_dictionary.json',
-        'categories_dictionary.csv', 'categories_dictionary.json',
+        'products_dictionary.csv', 'DICTIONERY_MASTER_PRODUCTS.json',
+        'categories_dictionary.csv', 'DICTIONERY_MASTER_CATEGORIES.json',
         'categories_hierarchy_dictionary.csv', 'categories_hierarchy_dictionary.json',
     ]:
         src = os.path.join(out_dir, fname)
