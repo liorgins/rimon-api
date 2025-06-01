@@ -240,6 +240,26 @@ function App() {
     }
   }, [user]);
 
+  // --- WHATSAPP BUTTON ---
+  function getWhatsappMessage() {
+    let msg = "Hi,\n\nI'd like to place an order:\n";
+    cart.forEach(item => {
+      const dictEntry = heDict[`${sanitize(item.id)},${sanitize(item.sku)}`] || {};
+      const englishName = dictEntry.english || item.title;
+      msg += `- ${englishName} (${item.qty})\n`;
+    });
+    console.log('Generated WhatsApp message:', msg, 'Length:', msg.length);
+    return msg;
+  }
+
+  function handleWhatsappClick() {
+    const msg = getWhatsappMessage();
+    const encodedMsg = encodeURIComponent(msg);
+    const url = `https://wa.me/972546505699?text=${encodedMsg}`;
+    console.log('Opening WhatsApp with url:', url, 'Length:', url.length);
+    window.open(url, '_blank');
+  }
+
   return (
     <GoogleOAuthProvider clientId="424276917259-055s59en5rcplijem54e3sl5i347u0qs.apps.googleusercontent.com">
       <div className="App" style={{ direction: 'rtl', textAlign: 'right', fontFamily: 'Heebo, Arial, sans-serif', background: '#f5f5f5', minHeight: '100vh' }}>
@@ -281,6 +301,7 @@ function App() {
             if (!dictEntry.hebrew) {
               missingHebrewKeys.push(`${sanitize(product.id)},${sanitize(product.sku)}`);
             }
+            const cartItem = cart.find(item => item.id === product.id);
             return (
               <div key={product.id} style={{ background: '#fff', borderRadius: '12px', boxShadow: '0 2px 8px #0001', padding: '1rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <img src={product.imgSrc} alt={hebrewName} style={{ width: '120px', height: '120px', objectFit: 'contain', marginBottom: '1rem', borderRadius: '8px', background: '#eee' }} />
@@ -288,7 +309,30 @@ function App() {
                 <div style={{ color: '#7b1fa2', fontWeight: 'bold', marginBottom: '0.5rem' }}>{product.finalPrice} {product.currency}</div>
                 <div style={{ color: '#666', fontSize: '0.9rem', marginBottom: '0.5rem', textAlign: 'center' }}>{product.categories}</div>
                 {product.available ? (
-                  <button style={{ background: '#7b1fa2', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.2rem', cursor: 'pointer', marginTop: 'auto' }} onClick={() => addToCart(product)}>הוסף לסל</button>
+                  cartItem ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 'auto' }}>
+                      <button
+                        onClick={() => {
+                          if (cartItem.qty === 1) {
+                            console.log('Remove from cart (trash)', product.id);
+                            removeFromCart(product.id);
+                          } else {
+                            console.log('Decrease qty', product.id);
+                            changeQty(product.id, -1);
+                          }
+                        }}
+                        style={{ border: '1px solid #ccc', borderRadius: 6, background: '#eee', width: 32, height: 32, fontWeight: 'bold', fontSize: 20, cursor: 'pointer' }}
+                      >
+                        {cartItem.qty === 1 ? <span role="img" aria-label="trash">🗑️</span> : '-'}
+                      </button>
+                      <span style={{ minWidth: 24, textAlign: 'center', fontWeight: 'bold', fontSize: 18 }}>{cartItem.qty}</span>
+                      <button onClick={() => { console.log('Increase qty', product.id); changeQty(product.id, 1); }} style={{ border: '1px solid #ccc', borderRadius: 6, background: '#eee', width: 32, height: 32, fontWeight: 'bold', fontSize: 20, cursor: 'pointer' }}>+</button>
+                    </div>
+                  ) : (
+                    <button style={{ background: '#7b1fa2', color: '#fff', border: 'none', borderRadius: '6px', padding: '0.5rem 1.2rem', cursor: 'pointer', marginTop: 'auto', fontWeight: 'bold' }} onClick={() => { console.log('Add to cart', product.id); addToCart(product); }}>
+                      הוסף לסל
+                    </button>
+                  )
                 ) : (
                   <div style={{ color: 'red', fontWeight: 'bold' }}>אזל מהמלאי</div>
                 )}
@@ -452,6 +496,35 @@ function App() {
             </div>
           )}
         </div>
+        {/* WhatsApp Floating Button */}
+        <button
+          onClick={handleWhatsappClick}
+          style={{
+            position: 'fixed',
+            left: 24,
+            bottom: 24,
+            zIndex: 500,
+            background: '#25D366',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '50%',
+            width: 64,
+            height: 64,
+            boxShadow: '0 4px 16px #0003',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 36,
+            cursor: 'pointer',
+            padding: 0,
+          }}
+          title="צור קשר בוואטסאפ"
+        >
+          <svg width="36" height="36" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="16" cy="16" r="16" fill="#25D366"/>
+            <path d="M23.472 18.294c-.355-.177-2.1-1.037-2.424-1.155-.324-.119-.56-.177-.797.177-.237.355-.914 1.155-1.122 1.392-.208.237-.414.266-.769.089-.355-.178-1.5-.553-2.86-1.763-1.057-.944-1.77-2.108-1.98-2.463-.208-.355-.022-.546.156-.723.16-.159.355-.414.533-.62.178-.207.237-.355.355-.592.119-.237.06-.444-.03-.62-.089-.177-.797-1.924-1.09-2.637-.287-.689-.58-.595-.797-.606-.207-.009-.444-.011-.68-.011-.237 0-.62.089-.944.444-.324.355-1.23 1.202-1.23 2.927 0 1.726 1.26 3.393 1.435 3.627.178.237 2.48 3.789 6.006 5.153.84.289 1.495.462 2.006.591.842.213 1.61.183 2.217.111.676-.08 2.1-.858 2.398-1.687.297-.83.297-1.541.208-1.687-.089-.148-.324-.237-.68-.414z" fill="#fff"/>
+          </svg>
+        </button>
       </div>
     </GoogleOAuthProvider>
   );
