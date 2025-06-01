@@ -6,9 +6,12 @@ from datetime import datetime
 from typing import List, Dict, Optional, Tuple
 import logging
 import time
+from config import LEVEL_MAP
+import subprocess
 
 # Logger setup
 class VerboseLogger:
+    """Custom logger that logs to both file and console, with configurable verbosity."""
     def __init__(self, log_file, level=logging.INFO):
         self.logger = logging.getLogger("RimonLogger")
         self.logger.handlers = []  # Remove any existing handlers to prevent duplicates
@@ -33,7 +36,7 @@ class VerboseLogger:
         self.level = level
 
 def fetch_from_api(url: str, logger: VerboseLogger) -> Optional[Dict]:
-    """Fetch data from API and save to JSON file."""
+    """Fetch data from the API and return it as a Python dict. Logs progress and errors."""
     try:
         logger.info("Fetching data from API...")
         logger.debug(f"Fetching data from: {url}")
@@ -50,7 +53,7 @@ def fetch_from_api(url: str, logger: VerboseLogger) -> Optional[Dict]:
         return None
 
 def flatten_categories(categories: List[Dict], parent_title: str = None) -> List[Dict]:
-    """Flatten the category hierarchy into a list of categories with parent information."""
+    """Flatten the category hierarchy into a flat list with parent information for CSV export."""
     flattened = []
     
     for category in categories:
@@ -75,7 +78,7 @@ def flatten_categories(categories: List[Dict], parent_title: str = None) -> List
     return flattened
 
 def clean_category_for_hierarchy(category: Dict) -> Dict:
-    """Clean category data for hierarchical export."""
+    """Clean category data for hierarchical export, recursively including subcategories."""
     cleaned = {
         'id': category.get('id', ''),
         'title': category.get('title', ''),
@@ -95,6 +98,7 @@ def clean_category_for_hierarchy(category: Dict) -> Dict:
     return cleaned
 
 def process_data(data: Dict, logger: VerboseLogger):
+    """Process the fetched data: save all outputs (categories, products, hierarchy) as CSV and JSON in the appropriate logs folder."""
     start_time = time.time()
     logs_dir = "logs"
     if not os.path.exists(logs_dir):
@@ -104,16 +108,19 @@ def process_data(data: Dict, logger: VerboseLogger):
     results_dir = os.path.join(logs_dir, f"{timestamp}")
     logger.info(f"Creating results directory: {results_dir}")
     os.makedirs(results_dir, exist_ok=True)
-    json_dir = os.path.join(results_dir, 'json')
-    csv_dir = os.path.join(results_dir, 'csv')
+    # Create 'Raw' subdirectory
+    raw_dir = os.path.join(results_dir, 'Raw')
+    os.makedirs(raw_dir, exist_ok=True)
+    json_dir = os.path.join(raw_dir, 'json')
+    csv_dir = os.path.join(raw_dir, 'csv')
     os.makedirs(json_dir, exist_ok=True)
     os.makedirs(csv_dir, exist_ok=True)
-    log_file = os.path.join(results_dir, 'run.log')
+    log_file = os.path.join(raw_dir, 'run.log')
     logger.debug(f"Log file: {log_file}")
     base_data = data['staticData']['data']['country_118']['primaryLang']
     categories = base_data.get('categories', {}).get('Data', [])
     products = base_data.get('products', [])
-    raw_data_json = os.path.join(results_dir, 'raw_data.json')
+    raw_data_json = os.path.join(raw_dir, 'raw_data.json')
     categories_csv = os.path.join(csv_dir, 'categories.csv')
     categories_json = os.path.join(json_dir, 'categories.json')
     categories_hierarchy_json = os.path.join(json_dir, 'categories-hierarchy.json')
@@ -193,23 +200,38 @@ def process_data(data: Dict, logger: VerboseLogger):
     logger.info(f"Elapsed time: {elapsed:.2f} seconds")
     logger.debug("Run finished.")
 
-if __name__ == "__main__":
-    API_URL = "https://rimonapi.weevi.com/api/ekomcategories/md_GetStaticData?searchKey=categories&preventcaching=true&returnasstring=false"
+    # Run create_category_map.py to update category_map.json
+    subprocess.run(['python3', 'create_category_map.py'], check=True)
+
+    # Write update.json to trigger React app refresh
+    update_path = os.path.join(os.path.dirname(__file__), 'ecommerce-site', 'public', 'update.json')
+    with open(update_path, 'w') as f:
+        json.dump({'updated': int(time.time())}, f)
+
+def run_full_extraction(api_url, verbosity):
+    """Main entry point: fetch data from API, process it, and save all outputs and logs for this run."""
+    import os
+    import logging
+    from datetime import datetime
     temp_logger = logging.getLogger("TempLogger")
-    temp_logger.handlers = []  # Remove any existing handlers to prevent duplicates
+    temp_logger.handlers = []
     temp_logger.addHandler(logging.StreamHandler())
-    temp_logger.setLevel(logging.INFO)
+    temp_logger.setLevel(verbosity)
     temp_logger.info("Starting run...")
-    data = fetch_from_api(API_URL, VerboseLogger('/dev/null'))
+    data = fetch_from_api(api_url, VerboseLogger(os.devnull, level=verbosity))
     if data is None:
         temp_logger.error("Failed to fetch data from API")
         exit(1)
     logs_dir = "logs"
-    if not os.path.exists(logs_dir):
-        os.makedirs(logs_dir)
+    os.makedirs(logs_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     results_dir = os.path.join(logs_dir, f"{timestamp}")
-    os.makedirs(results_dir, exist_ok=True)
-    log_file = os.path.join(results_dir, 'run.log')
-    logger = VerboseLogger(log_file, level=logging.INFO)
-    process_data(data, logger) 
+    raw_dir = os.path.join(results_dir, 'Raw')
+    os.makedirs(raw_dir, exist_ok=True)
+    log_file = os.path.join(raw_dir, 'run.log')
+    logger = VerboseLogger(log_file, level=verbosity)
+    process_data(data, logger)
+
+if __name__ == "__main__":
+    API_URL = "https://rimonapi.weevi.com/api/ekomcategories/md_GetStaticData?searchKey=categories&preventcaching=true&returnasstring=false"
+    run_full_extraction(API_URL, logging.INFO) 
