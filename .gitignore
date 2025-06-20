@@ -8,3 +8,4 @@ __pycache__/
 eng-heb-dictionary/dictionary.log
 .DS_Store
 ecommerce-site-4567.log
+.env
